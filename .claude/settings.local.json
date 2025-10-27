@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:www.anthropic.com)",
+      "Bash(mkdir:*)",
+      "Skill(skill-creator)",
+      "Bash(python scripts/init_skill.py:*)",
+      "Bash(python:*)",
+      "Read(//c/Users/andre/.claude/skills//**)",
+      "Bash(PYTHONIOENCODING=utf-8 python:*)",
+      "WebSearch",
+      "Skill(claude-agent-sdk-expert)",
+      "Skill(pdf)",
+      "Bash(pip install:*)",
+      "Skill(cybersecurity-cv-analyzer)",
+      "Skill(prd-spec-kit)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
