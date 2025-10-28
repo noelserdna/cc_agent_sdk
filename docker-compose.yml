@@ -1,0 +1,94 @@
+# CV Cybersecurity Analyzer API - Docker Compose Configuration
+# Production deployment setup
+
+version: '3.8'
+
+services:
+  cv-analyzer-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cv-analyzer-api
+    image: cv-analyzer-api:1.0.0
+
+    # Port mapping
+    ports:
+      - "8000:8000"
+
+    # Environment variables (use .env file for sensitive data)
+    environment:
+      # API Configuration
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+      - API_WORKERS=4
+
+      # Authentication (load from .env file)
+      - API_KEYS=${API_KEYS}
+
+      # Claude Agent SDK (load from .env file)
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - CLAUDE_MODEL=${CLAUDE_MODEL:-claude-sonnet-4-5-20250929}
+      - CLAUDE_MAX_TOKENS=${CLAUDE_MAX_TOKENS:-8192}
+
+      # File Upload
+      - MAX_FILE_SIZE_MB=10
+      - ALLOWED_EXTENSIONS=pdf
+
+      # Retry Configuration
+      - RETRY_MAX_ATTEMPTS=3
+      - RETRY_DELAYS=1,2,4
+      - RETRY_MAX_TOTAL_SECONDS=30
+
+      # Logging
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - LOG_FORMAT=json
+      - LOG_PII_REDACTION=true
+
+      # Performance
+      - ANALYSIS_TIMEOUT_SECONDS=30
+      - CONCURRENT_REQUESTS_LIMIT=10
+
+    # Volume mounts for logs (optional)
+    volumes:
+      - ./logs:/app/logs:rw
+
+    # Restart policy
+    restart: unless-stopped
+
+    # Health check
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/v1/health').read()"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    # Network configuration
+    networks:
+      - cv-analyzer-network
+
+networks:
+  cv-analyzer-network:
+    driver: bridge
+    name: cv-analyzer-network
+
+volumes:
+  logs:
+    driver: local

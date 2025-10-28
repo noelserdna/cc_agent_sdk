@@ -1,0 +1,104 @@
+JUAN CARLOS PÉREZ GARCÍA
+Analista de Seguridad Senior | Pentester Certificado
+Email: jcperez@email.com | LinkedIn: linkedin.com/in/jcperez | GitHub: github.com/jcperez
+
+RESUMEN PROFESIONAL
+Profesional de ciberseguridad con 8 años de experiencia en IT y 5 años especializados en seguridad informática. Experto en pruebas de penetración, análisis de vulnerabilidades y respuesta a incidentes. Certificaciones OSCP, CEH y AWS Security Specialty. Experiencia liderando equipos de Red Team y mejorando la postura de seguridad en entornos cloud.
+
+EXPERIENCIA PROFESIONAL
+
+Analista de Seguridad Senior | SecureBank SA | 2021 - Presente (3 años)
+- Liderazgo del equipo de Red Team con 4 miembros, realizando ejercicios de penetración trimestral
+- Implementación de pipeline DevSecOps con integración de SAST/DAST en CI/CD usando Jenkins y SonarQube
+- Gestión de respuesta a 12 incidentes críticos de seguridad con tiempo medio de resolución de 4 horas
+- Desarrollo de scripts Python para automatización de análisis de vulnerabilidades (Nmap, Nessus, Burp Suite)
+- Configuración y hardening de infraestructura AWS (EC2, S3, IAM, Security Groups, CloudTrail)
+
+Pentester | CyberDefense Corp | 2019 - 2021 (2 años)
+- Ejecución de más de 50 pruebas de penetración en aplicaciones web, redes corporativas y APIs REST
+- Identificación y explotación de vulnerabilidades OWASP Top 10 (SQLi, XSS, CSRF, IDOR)
+- Redacción de informes técnicos detallados con recomendaciones de remediación
+- Uso avanzado de herramientas: Metasploit, Burp Suite Pro, Wireshark, Hashcat, John the Ripper
+- Participación en ejercicios de Purple Team para mejora de detección SOC
+
+Analista SOC Junior | TechSolutions | 2017 - 2019 (2 años)
+- Monitoreo 24/7 de eventos de seguridad usando Splunk y QRadar SIEM
+- Análisis de alertas de IDS/IPS (Snort, Suricata) y correlación de eventos
+- Investigación de malware y análisis forense básico con herramientas como Volatility y Autopsy
+- Gestión de tickets de incidentes en plataforma ServiceNow
+- Colaboración en desarrollo de playbooks de respuesta a incidentes
+
+CERTIFICACIONES
+- Offensive Security Certified Professional (OSCP) - 2020
+- Certified Ethical Hacker (CEH) - 2019
+- AWS Certified Security - Specialty - 2022
+- CompTIA Security+ - 2018
+
+FORMACIÓN ACADÉMICA
+- Máster en Ciberseguridad | Universidad Politécnica de Madrid | 2016-2017
+- Ingeniería Informática | Universidad Complutense de Madrid | 2012-2016
+
+HABILIDADES TÉCNICAS
+
+Offensive Security:
+- Penetration Testing (web, network, wireless)
+- Exploit Development (Buffer Overflow, ROP)
+- Social Engineering & Phishing Campaigns
+- Red Team Operations
+
+Defensive Security:
+- SIEM Management (Splunk, QRadar, ELK Stack)
+- Incident Response & Digital Forensics
+- Threat Hunting & Malware Analysis
+- Security Monitoring & SOC Operations
+
+Cloud Security:
+- AWS Security (IAM, VPC, CloudTrail, GuardDuty, Security Hub)
+- Azure Security Center
+- Container Security (Docker, Kubernetes)
+
+Programming & Scripting:
+- Python (scripting, automation, exploit development)
+- Bash/PowerShell (automation)
+- JavaScript (basic web exploitation)
+
+Tools & Technologies:
+- Burp Suite Pro, Metasploit, Cobalt Strike
+- Nmap, Nessus, OpenVAS, Qualys
+- Wireshark, tcpdump
+- Git, Docker, Jenkins
+- OWASP ZAP, SQLMap
+
+Governance & Compliance:
+- ISO 27001 (implementación básica)
+- NIST Cybersecurity Framework
+- PCI-DSS (evaluaciones)
+
+IDIOMAS
+- Español (nativo)
+- Inglés (C1 - Advanced, TOEFL 105/120)
+
+PROYECTOS Y CONTRIBUCIONES
+
+Open Source:
+- Contribuciones a OWASP ModSecurity Core Rule Set (GitHub)
+- Desarrollo de herramienta de enumeración de subdominios en Python (150+ stars)
+
+Publicaciones:
+- "Advanced Persistent Threats in Cloud Environments" - Revista Seguridad IT (2022)
+- Ponencia en RootedCON 2023: "Evading EDR Detection in Red Team Operations"
+
+CTFs & Bug Bounties:
+- Top 50 en HackTheBox (Elite Hacker rank)
+- 15 vulnerabilidades reportadas en programas de Bug Bounty (HackerOne, Bugcrowd)
+- Participación en CTFs: DEF CON, Google CTF, Pwn2Win
+
+OTRAS HABILIDADES
+- Gestión de equipos (4 personas directas)
+- Comunicación efectiva con stakeholders técnicos y no técnicos
+- Redacción de informes ejecutivos y técnicos
+- Capacitación y mentoría de analistas junior
+- Gestión de crisis en incidentes de seguridad críticos
+
+REFERENCIAS
+Disponibles bajo solicitud

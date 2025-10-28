@@ -31,7 +31,18 @@
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-[Gates determined based on constitution file]
+Verify compliance with `.specify/memory/constitution.md` core principles:
+
+- [ ] **Agent-First Development**: Feature provides agent-operable interfaces with context gathering, action execution, and verification
+- [ ] **Verification-Driven Design**: All operations include explicit success/failure indicators and self-validation
+- [ ] **Type Safety & Validation**: TypeScript strict mode, Zod schemas for all tool interfaces, no unjustified `any` types
+- [ ] **Security by Default**: Permission modes explicit, dangerous operations justified and logged via hooks
+- [ ] **Observable & Auditable**: Operations logged via hooks (onPreToolUse, onPostToolUse), structured logging with PII redaction
+- [ ] **Test-First for Autonomy**: Tool handlers have 100% unit test coverage, agent workflows have integration tests validating outcomes
+- [ ] **Custom Tools as APIs**: Domain logic in typed, validated, composable custom tools (not bash scripts)
+
+**Violations Requiring Justification**:
+(Only fill if principles cannot be followed - document why and what alternatives were considered)
 
 ## Project Structure
 

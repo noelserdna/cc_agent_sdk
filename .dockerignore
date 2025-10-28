@@ -1,0 +1,127 @@
+# CV Cybersecurity Analyzer API - Docker Ignore
+# Exclude files from Docker build context
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Documentation
+README.md
+CLAUDE.md
+TEST_GUIDE.md
+*.md
+docs/
+specs/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+.venv/
+
+# IDEs
+.idea/
+.vscode/
+*.code-workspace
+*.iml
+*.iws
+
+# Environment files (should be mounted or injected at runtime)
+.env
+.env.*
+*.env
+
+# Logs (should be mounted as volume)
+logs/
+*.log
+log/
+*.log.*
+
+# Testing
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+.hypothesis/
+.pytype/
+cov.xml
+*.lcov
+tests/
+test_*.py
+*_test.py
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Type checking
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Linting
+.ruff_cache/
+
+# VCR cassettes
+tests/integration/cassettes/
+tests/fixtures/vcr_cassettes/
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+*.bak
+*.orig
+
+# OS-specific
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+Jenkinsfile
+
+# Local development
+scratch/
+tmp/
+temp/
+
+# Claude Code
+.claude/
+.specify/
+
+# PDF test files (fixtures should not be in container)
+*.pdf
+
+# Configuration examples (use actual config at runtime)
+config/.env.example

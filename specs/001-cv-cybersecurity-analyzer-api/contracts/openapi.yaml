@@ -1,0 +1,701 @@
+openapi: 3.1.0
+
+info:
+  title: CV Cybersecurity Analyzer API
+  description: |
+    Autonomous agent-powered API for analyzing cybersecurity professional CVs.
+
+    Accepts PDF uploads, extracts text, performs evaluation across 24 specialized
+    parameters, and returns structured JSON analysis with scoring, red flags,
+    recommendations, and interview suggestions.
+
+    **Key Features:**
+    - 24-parameter specialized cybersecurity scoring
+    - Red flag detection (gaps, mismatches, inconsistencies)
+    - Career development recommendations
+    - Tailored interview questions
+    - <30s response time (p95)
+    - No data persistence (stateless)
+
+    **Authentication:** API Key via X-API-Key header
+  version: 1.0.0
+  contact:
+    name: API Support
+  license:
+    name: Proprietary
+
+servers:
+  - url: https://api.example.com/v1
+    description: Production server
+  - url: http://localhost:8000/v1
+    description: Local development server
+
+security:
+  - ApiKeyAuth: []
+
+tags:
+  - name: analysis
+    description: CV analysis operations
+  - name: health
+    description: System health monitoring
+
+paths:
+  /analyze-cv:
+    post:
+      tags:
+        - analysis
+      summary: Analyze cybersecurity CV
+      description: |
+        Uploads a PDF CV, extracts text, and performs comprehensive cybersecurity
+        evaluation across 24 parameters using autonomous agent.
+
+        **Processing time:** <30 seconds for 2-4 page CVs
+
+        **Supported formats:** PDF only (digital or scanned with OCR)
+
+        **Max file size:** 10MB
+      operationId: analyzeCv
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: PDF file containing the CV (max 10MB)
+                role_target:
+                  type: string
+                  minLength: 3
+                  maxLength: 100
+                  description: Optional target job position for contextualized analysis
+                  example: "Senior Cloud Security Engineer"
+                language:
+                  type: string
+                  enum: [es, en]
+                  default: es
+                  description: Preferred output language for analysis
+            encoding:
+              file:
+                contentType: application/pdf
+      responses:
+        '200':
+          description: CV analysis completed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CVAnalysisResponse'
+              example:
+                analysis_metadata:
+                  timestamp: "2025-10-27T14:30:00Z"
+                  parsing_confidence: 0.95
+                  cv_language: "es"
+                  analysis_version: "1.0.0"
+                  processing_duration_ms: 12500
+                candidate_summary:
+                  name: "John Doe"
+                  total_score: 7.8
+                  percentile: 75
+                  detected_role: "Penetration Tester"
+                  seniority_level: "Senior"
+                  years_experience:
+                    total_it: 8.5
+                    cybersecurity: 6.0
+                    current_role: 2.5
+                detailed_scores:
+                  certifications:
+                    score: 8.5
+                    justification: "Holds OSCP and CEH certifications, demonstrating practical offensive security skills"
+                    evidence: ["OSCP certified (2022)", "CEH v11 (2021)"]
+                    weight: 1.2
+                  offensive_skills:
+                    score: 9.0
+                    justification: "Extensive penetration testing experience across web, mobile, and network domains"
+                    evidence: ["Conducted 50+ penetration tests", "Expertise in OWASP Top 10"]
+                    weight: 1.1
+                strengths:
+                  - area: "Offensive Security"
+                    description: "Exceptional penetration testing skills with proven track record in identifying critical vulnerabilities"
+                    score: 9.0
+                    market_value: "high"
+                  - area: "Certifications"
+                    description: "Strong certification portfolio including OSCP, highly valued in the market"
+                    score: 8.5
+                    market_value: "high"
+                red_flags:
+                  - type: "employment_gap"
+                    severity: "medium"
+                    description: "18-month gap between positions in 2020-2021"
+                    impact: "May indicate career instability or personal challenges; recommend clarifying during interview"
+                recommendations:
+                  certifications: ["OSWE (Offensive Security Web Expert)", "GXPN (GIAC Exploit Researcher)"]
+                  training: ["Advanced Exploit Development", "Mobile Application Security"]
+                  experience_areas: ["Cloud penetration testing", "Kubernetes security assessments"]
+                  next_role_suggestions: ["Lead Penetration Tester", "Application Security Lead"]
+                interview_suggestions:
+                  technical_questions:
+                    - "Walk me through your process for discovering and exploiting SSRF vulnerabilities"
+                    - "Explain how you would bypass modern WAF protections during a web app pentest"
+                    - "Describe your experience with Active Directory exploitation techniques"
+                  scenario_questions:
+                    - "Tell me about a complex vulnerability you discovered and how you demonstrated business impact"
+                    - "How do you handle situations where a client disputes your findings?"
+                  verification_questions:
+                    - "Can you explain the OSCP exam process and the specific challenges you faced?"
+        '400':
+          description: Bad Request - Invalid file format or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalid_file_format:
+                  value:
+                    error: "invalid_file_format"
+                    message: "File must be in PDF format"
+                    details: "Received content-type: image/jpeg"
+                file_corrupted:
+                  value:
+                    error: "file_corrupted"
+                    message: "Unable to extract text from PDF"
+                    details: "PDF appears to be corrupted or password-protected"
+                low_parsing_confidence:
+                  value:
+                    error: "low_parsing_confidence"
+                    message: "Low text extraction quality"
+                    parsing_confidence: 0.45
+                    details: "Please provide a digital PDF or higher quality scan"
+        '401':
+          description: Unauthorized - Missing or invalid API key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "unauthorized"
+                message: "Invalid or missing API key"
+                details: "Provide a valid API key in the X-API-Key header"
+        '413':
+          description: Payload Too Large - File exceeds 10MB limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "file_too_large"
+                message: "File size exceeds maximum allowed (10MB)"
+                details: "Received file size: 12.5MB"
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "internal_error"
+                message: "An unexpected error occurred during processing"
+                details: "Request ID: 550e8400-e29b-41d4-a716-446655440000"
+        '503':
+          description: Service Unavailable - Claude API unavailable or timeout
+          headers:
+            Retry-After:
+              description: Seconds to wait before retrying
+              schema:
+                type: integer
+                example: 60
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "service_unavailable"
+                message: "Claude API temporarily unavailable"
+                details: "All retry attempts exhausted. Please try again later."
+
+  /health:
+    get:
+      tags:
+        - health
+      summary: Health check endpoint
+      description: |
+        Returns service health status, version information, and uptime.
+
+        Used for monitoring and load balancer health checks.
+
+        **Response time:** <500ms
+      operationId: healthCheck
+      security: []
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              example:
+                status: "healthy"
+                version: "1.0.0"
+                agent_sdk_version: "0.40.0"
+                uptime_seconds: 86400
+        '503':
+          description: Service is unhealthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              example:
+                status: "unhealthy"
+                version: "1.0.0"
+                agent_sdk_version: "0.40.0"
+                uptime_seconds: 3600
+                details: "Claude API connectivity check failed"
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API key for authentication
+
+  schemas:
+    CVAnalysisResponse:
+      type: object
+      required:
+        - analysis_metadata
+        - candidate_summary
+        - detailed_scores
+        - strengths
+        - improvement_areas
+        - red_flags
+        - recommendations
+        - interview_suggestions
+      properties:
+        analysis_metadata:
+          $ref: '#/components/schemas/AnalysisMetadata'
+        candidate_summary:
+          $ref: '#/components/schemas/CandidateSummary'
+        detailed_scores:
+          $ref: '#/components/schemas/DetailedScores'
+        strengths:
+          type: array
+          items:
+            $ref: '#/components/schemas/Strength'
+          minItems: 5
+          maxItems: 5
+          description: Top 5 candidate strengths
+        improvement_areas:
+          type: array
+          items:
+            $ref: '#/components/schemas/ImprovementArea'
+          description: Prioritized development opportunities
+        red_flags:
+          type: array
+          items:
+            $ref: '#/components/schemas/RedFlag'
+          description: Detected concerns or inconsistencies
+        recommendations:
+          $ref: '#/components/schemas/Recommendations'
+        interview_suggestions:
+          $ref: '#/components/schemas/InterviewSuggestions'
+
+    AnalysisMetadata:
+      type: object
+      required:
+        - timestamp
+        - parsing_confidence
+        - cv_language
+        - analysis_version
+        - processing_duration_ms
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+          description: Analysis completion timestamp (ISO 8601)
+        parsing_confidence:
+          type: number
+          format: float
+          minimum: 0.0
+          maximum: 1.0
+          description: Text extraction quality score
+        cv_language:
+          type: string
+          minLength: 2
+          maxLength: 2
+          description: Detected CV language (ISO 639-1)
+          example: "es"
+        analysis_version:
+          type: string
+          pattern: '^\d+\.\d+\.\d+$'
+          description: API version used for analysis (semver)
+          example: "1.0.0"
+        processing_duration_ms:
+          type: integer
+          minimum: 1
+          description: Time taken to complete analysis in milliseconds
+
+    CandidateSummary:
+      type: object
+      required:
+        - name
+        - total_score
+        - percentile
+        - detected_role
+        - seniority_level
+        - years_experience
+      properties:
+        name:
+          type: string
+          minLength: 2
+          description: Extracted candidate name
+        total_score:
+          type: number
+          format: float
+          minimum: 0.0
+          maximum: 10.0
+          description: Weighted average of 24 parameters
+        percentile:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: Ranking vs market benchmarks
+        detected_role:
+          type: string
+          minLength: 1
+          description: Primary specialization
+          example: "Cloud Security Engineer"
+        seniority_level:
+          type: string
+          enum: [Junior, Mid, Senior, Lead, Executive]
+          description: Career level based on experience
+        years_experience:
+          $ref: '#/components/schemas/YearsExperience'
+
+    YearsExperience:
+      type: object
+      required:
+        - total_it
+        - cybersecurity
+        - current_role
+      properties:
+        total_it:
+          type: number
+          format: float
+          minimum: 0
+          description: Total years in IT/technology
+        cybersecurity:
+          type: number
+          format: float
+          minimum: 0
+          description: Years specifically in cybersecurity
+        current_role:
+          type: number
+          format: float
+          minimum: 0
+          description: Years in current role
+
+    DetailedScores:
+      type: object
+      required:
+        - certifications
+        - offensive_skills
+        - defensive_skills
+        - governance
+        - cloud_security
+        - tools
+        - programming
+        - architecture
+        - education
+        - soft_skills
+        - languages
+        - devsecops
+        - forensics
+        - cryptography
+        - ot_ics
+        - mobile_iot
+        - threat_intel
+        - contributions
+        - publications
+        - management
+        - crisis
+        - transformation
+        - niche_specialties
+        - experience
+      properties:
+        certifications:
+          $ref: '#/components/schemas/CybersecurityParameter'
+        offensive_skills:
+          $ref: '#/components/schemas/CybersecurityParameter'
+        defensive_skills:
+          $ref: '#/components/schemas/CybersecurityParameter'
+        governance:
+          $ref: '#/components/schemas/CybersecurityParameter'
+        cloud_security:
+          $ref: '#/components/schemas/CybersecurityParameter'
+        tools:
+          $ref: '#/components/schemas/CybersecurityParameter'
+        programming:
+          $ref: '#/components/schemas/CybersecurityParameter'
+        architecture:
+          $ref: '#/components/schemas/CybersecurityParameter'
+        education:
+          $ref: '#/components/schemas/CybersecurityParameter'
+        soft_skills:
+          $ref: '#/components/schemas/CybersecurityParameter'
+        languages:
+          $ref: '#/components/schemas/CybersecurityParameter'
+        devsecops:
+          $ref: '#/components/schemas/CybersecurityParameter'
+        forensics:
+          $ref: '#/components/schemas/CybersecurityParameter'
+        cryptography:
+          $ref: '#/components/schemas/CybersecurityParameter'
+        ot_ics:
+          $ref: '#/components/schemas/CybersecurityParameter'
+        mobile_iot:
+          $ref: '#/components/schemas/CybersecurityParameter'
+        threat_intel:
+          $ref: '#/components/schemas/CybersecurityParameter'
+        contributions:
+          $ref: '#/components/schemas/CybersecurityParameter'
+        publications:
+          $ref: '#/components/schemas/CybersecurityParameter'
+        management:
+          $ref: '#/components/schemas/CybersecurityParameter'
+        crisis:
+          $ref: '#/components/schemas/CybersecurityParameter'
+        transformation:
+          $ref: '#/components/schemas/CybersecurityParameter'
+        niche_specialties:
+          $ref: '#/components/schemas/CybersecurityParameter'
+        experience:
+          $ref: '#/components/schemas/CybersecurityParameter'
+
+    CybersecurityParameter:
+      type: object
+      required:
+        - score
+        - justification
+        - evidence
+        - weight
+      properties:
+        score:
+          type: number
+          format: float
+          minimum: 0.0
+          maximum: 10.0
+          description: Numerical score for this parameter
+        justification:
+          type: string
+          minLength: 20
+          description: Written explanation for the score
+        evidence:
+          type: array
+          items:
+            type: string
+          description: Specific CV quotes supporting the score
+        weight:
+          type: number
+          format: float
+          minimum: 0.5
+          maximum: 1.5
+          description: Parameter weight for total_score calculation
+
+    Strength:
+      type: object
+      required:
+        - area
+        - description
+        - score
+        - market_value
+      properties:
+        area:
+          type: string
+          minLength: 1
+          description: Strength domain name
+        description:
+          type: string
+          minLength: 20
+          description: Detailed explanation
+        score:
+          type: number
+          format: float
+          minimum: 7.0
+          maximum: 10.0
+          description: Associated parameter score
+        market_value:
+          type: string
+          enum: [high, medium, low]
+          description: Market demand assessment
+
+    ImprovementArea:
+      type: object
+      required:
+        - area
+        - current_score
+        - gap_description
+        - recommendations
+        - priority
+      properties:
+        area:
+          type: string
+          minLength: 1
+          description: Parameter needing improvement
+        current_score:
+          type: number
+          format: float
+          minimum: 0.0
+          maximum: 10.0
+          description: Current parameter score
+        gap_description:
+          type: string
+          minLength: 20
+          description: Explanation of deficiency
+        recommendations:
+          type: array
+          items:
+            type: string
+          minItems: 1
+          description: Specific actionable suggestions
+        priority:
+          type: string
+          enum: [high, medium, low]
+          description: Improvement urgency
+
+    RedFlag:
+      type: object
+      required:
+        - type
+        - severity
+        - description
+        - impact
+      properties:
+        type:
+          type: string
+          enum:
+            - employment_gap
+            - certification_mismatch
+            - skill_inconsistency
+            - frequent_job_changes
+            - missing_fundamentals
+            - unclear_progression
+          description: Red flag classification
+        severity:
+          type: string
+          enum: [low, medium, high]
+          description: Risk level
+        description:
+          type: string
+          minLength: 20
+          description: Detailed explanation
+        impact:
+          type: string
+          minLength: 20
+          description: Hiring decision implications
+
+    Recommendations:
+      type: object
+      required:
+        - certifications
+        - training
+        - experience_areas
+        - next_role_suggestions
+      properties:
+        certifications:
+          type: array
+          items:
+            type: string
+          description: Suggested professional certifications
+        training:
+          type: array
+          items:
+            type: string
+          description: Recommended courses or training programs
+        experience_areas:
+          type: array
+          items:
+            type: string
+          description: Domains to gain hands-on experience
+        next_role_suggestions:
+          type: array
+          items:
+            type: string
+          description: Potential next career moves
+
+    InterviewSuggestions:
+      type: object
+      required:
+        - technical_questions
+        - scenario_questions
+        - verification_questions
+      properties:
+        technical_questions:
+          type: array
+          items:
+            type: string
+          minItems: 3
+          description: Domain-specific technical questions
+        scenario_questions:
+          type: array
+          items:
+            type: string
+          minItems: 2
+          description: Situational/behavioral questions
+        verification_questions:
+          type: array
+          items:
+            type: string
+          description: Questions to verify specific claims or certs
+
+    HealthResponse:
+      type: object
+      required:
+        - status
+        - version
+        - agent_sdk_version
+        - uptime_seconds
+      properties:
+        status:
+          type: string
+          enum: [healthy, unhealthy]
+          description: Overall service health status
+        version:
+          type: string
+          pattern: '^\d+\.\d+\.\d+$'
+          description: API version (semver)
+        agent_sdk_version:
+          type: string
+          description: Claude Agent SDK version in use
+        uptime_seconds:
+          type: integer
+          minimum: 0
+          description: Service uptime in seconds
+        details:
+          type: string
+          description: Additional health information (only if unhealthy)
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+          description: Machine-readable error code
+        message:
+          type: string
+          description: Human-readable error message
+        details:
+          type: string
+          description: Additional error context
+        parsing_confidence:
+          type: number
+          format: float
+          minimum: 0.0
+          maximum: 1.0
+          description: Parsing confidence (only for low_parsing_confidence errors)

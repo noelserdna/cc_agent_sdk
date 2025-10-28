@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CV Cybersecurity Analyzer</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+    <!-- Vista 1: Upload -->
+    <section id="upload-view" class="view active">
+        <div class="container">
+            <header class="app-header">
+                <h1>CV Cybersecurity Analyzer</h1>
+                <p class="subtitle">Análisis automatizado de CVs de ciberseguridad con IA</p>
+            </header>
+
+            <div class="upload-section">
+                <div id="drop-zone" class="drop-zone">
+                    <input type="file" id="file-input" accept=".pdf" hidden>
+                    <label for="file-input" class="drop-zone-label">
+                        <svg class="upload-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                        </svg>
+                        <p class="drop-text">Arrastra tu CV aquí o haz clic para seleccionar</p>
+                        <p class="drop-hint">Solo archivos PDF, máximo 10MB</p>
+                        <p id="file-name" class="file-name"></p>
+                    </label>
+                </div>
+
+                <div class="form-group">
+                    <label for="role-target">Rol objetivo (opcional):</label>
+                    <input type="text" id="role-target" placeholder="Ej: Cloud Security Engineer" maxlength="100">
+                    <small>Ayuda a contextualizar el análisis para un rol específico</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="language">Idioma del análisis:</label>
+                    <select id="language">
+                        <option value="es">Español</option>
+                        <option value="en">English</option>
+                    </select>
+                </div>
+
+                <button id="analyze-btn" class="btn btn-primary" disabled>
+                    <span>Analizar CV</span>
+                </button>
+
+                <div id="error-message" class="error-message"></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Vista 2: Loading -->
+    <section id="loading-view" class="view">
+        <div class="container loading-container">
+            <div class="spinner"></div>
+            <p class="loading-text">Analizando CV...</p>
+            <p class="loading-hint">Esto puede tomar hasta 90 segundos</p>
+        </div>
+    </section>
+
+    <!-- Vista 3: Results -->
+    <section id="results-view" class="view">
+        <div class="container">
+            <header class="app-header">
+                <h1>Resultados del Análisis</h1>
+            </header>
+
+            <div id="results-content">
+                <!-- Header con score total -->
+                <div class="results-header">
+                    <div class="score-card">
+                        <h3>Score Total</h3>
+                        <div class="score-gauge-container">
+                            <canvas id="score-gauge"></canvas>
+                            <div class="score-value">
+                                <span id="total-score">0.0</span>
+                                <span class="score-max">/10</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="percentile-card">
+                        <h3>Percentil</h3>
+                        <div class="percentile-value">
+                            <span id="percentile">0</span>
+                            <span class="percentile-symbol">%</span>
+                        </div>
+                        <p>vs mercado</p>
+                    </div>
+
+                    <div class="candidate-info">
+                        <h3>Información del Candidato</h3>
+                        <div class="info-grid">
+                            <div class="info-item">
+                                <span class="info-label">Nombre:</span>
+                                <span id="candidate-name" class="info-value">-</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Rol Detectado:</span>
+                                <span id="detected-role" class="info-value">-</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Seniority:</span>
+                                <span id="seniority-level" class="info-value">-</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Experiencia Total:</span>
+                                <span id="years-experience" class="info-value">-</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Gráfico Radar de 24 parámetros -->
+                <div class="chart-section">
+                    <h2>Evaluación por Categorías</h2>
+                    <div class="radar-chart-container">
+                        <canvas id="radar-chart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Fortalezas -->
+                <div class="strengths-section">
+                    <h2>Fortalezas Principales</h2>
+                    <div id="strengths-grid" class="strengths-grid">
+                        <!-- Cards generados dinámicamente -->
+                    </div>
+                </div>
+
+                <!-- Áreas de Mejora -->
+                <div class="improvements-section">
+                    <h2>Áreas de Mejora</h2>
+                    <div id="improvements-list" class="improvements-list">
+                        <!-- Lista generada dinámicamente -->
+                    </div>
+                </div>
+
+                <!-- Red Flags -->
+                <div class="redflags-section">
+                    <h2>Alertas y Red Flags</h2>
+                    <div id="redflags-list" class="redflags-list">
+                        <!-- Lista generada dinámicamente -->
+                    </div>
+                </div>
+
+                <!-- Recomendaciones -->
+                <div class="recommendations-section">
+                    <h2>Recomendaciones</h2>
+                    <div class="tabs">
+                        <button class="tab-btn active" data-tab="certifications">Certificaciones</button>
+                        <button class="tab-btn" data-tab="training">Training</button>
+                        <button class="tab-btn" data-tab="experience">Experiencia</button>
+                        <button class="tab-btn" data-tab="next-roles">Próximos Roles</button>
+                    </div>
+                    <div class="tab-content">
+                        <div id="tab-certifications" class="tab-pane active">
+                            <ul id="recommendations-certifications"></ul>
+                        </div>
+                        <div id="tab-training" class="tab-pane">
+                            <ul id="recommendations-training"></ul>
+                        </div>
+                        <div id="tab-experience" class="tab-pane">
+                            <ul id="recommendations-experience"></ul>
+                        </div>
+                        <div id="tab-next-roles" class="tab-pane">
+                            <ul id="recommendations-next-roles"></ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Preguntas de Entrevista -->
+                <div class="interview-section">
+                    <h2>Sugerencias para la Entrevista</h2>
+                    <div class="accordion">
+                        <div class="accordion-item">
+                            <button class="accordion-header" data-target="technical-questions">
+                                <span>Preguntas Técnicas</span>
+                                <svg class="accordion-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                                </svg>
+                            </button>
+                            <div id="technical-questions" class="accordion-content">
+                                <ul id="interview-technical"></ul>
+                            </div>
+                        </div>
+                        <div class="accordion-item">
+                            <button class="accordion-header" data-target="scenario-questions">
+                                <span>Preguntas de Escenarios</span>
+                                <svg class="accordion-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                                </svg>
+                            </button>
+                            <div id="scenario-questions" class="accordion-content">
+                                <ul id="interview-scenario"></ul>
+                            </div>
+                        </div>
+                        <div class="accordion-item">
+                            <button class="accordion-header" data-target="verification-questions">
+                                <span>Preguntas de Verificación</span>
+                                <svg class="accordion-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                                </svg>
+                            </button>
+                            <div id="verification-questions" class="accordion-content">
+                                <ul id="interview-verification"></ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Metadata -->
+                <div class="metadata-section">
+                    <h3>Información del Análisis</h3>
+                    <div class="metadata-grid">
+                        <div class="metadata-item">
+                            <span class="metadata-label">Fecha:</span>
+                            <span id="analysis-timestamp" class="metadata-value">-</span>
+                        </div>
+                        <div class="metadata-item">
+                            <span class="metadata-label">Tiempo de procesamiento:</span>
+                            <span id="processing-duration" class="metadata-value">-</span>
+                        </div>
+                        <div class="metadata-item">
+                            <span class="metadata-label">Confianza del parsing:</span>
+                            <span id="parsing-confidence" class="metadata-value">-</span>
+                        </div>
+                        <div class="metadata-item">
+                            <span class="metadata-label">Idioma del CV:</span>
+                            <span id="cv-language" class="metadata-value">-</span>
+                        </div>
+                    </div>
+                </div>
+
+                <button id="reset-btn" class="btn btn-secondary">Analizar otro CV</button>
+            </div>
+        </div>
+    </section>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
