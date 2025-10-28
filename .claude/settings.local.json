@@ -54,7 +54,8 @@
       "Bash(powershell.exe -Command:*)",
       "Bash(cp:*)",
       "mcp__playwright__browser_take_screenshot",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ],
     "deny": [],
     "ask": []
