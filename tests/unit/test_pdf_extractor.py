@@ -48,9 +48,14 @@ class TestPDFExtractor:
     @pytest.mark.asyncio
     async def test_extract_text_success(self, sample_cv_path, mock_pdf_text):
         """Test successful PDF text extraction"""
-        # Mock the pdf skill invocation
+        # Mock the pdf skill invocation with new enriched format
         with patch('src.services.pdf_extractor.invoke_pdf_skill', new_callable=AsyncMock) as mock_skill:
-            mock_skill.return_value = mock_pdf_text
+            mock_skill.return_value = {
+                "text": mock_pdf_text,
+                "page_count": 2,
+                "tables": [],
+                "metadata": {"title": "CV", "author": "Test"}
+            }
 
             extractor = PDFExtractor()
             result = await extractor.extract_text(sample_cv_path)
@@ -61,6 +66,9 @@ class TestPDFExtractor:
             assert result.parsing_confidence > 0.0
             assert result.parsing_confidence <= 1.0
             assert len(result.text) > 100
+            assert result.page_count == 2
+            assert result.tables == []
+            assert result.metadata == {"title": "CV", "author": "Test"}
 
             # Verify skill was called with correct parameters
             mock_skill.assert_called_once_with("extract_text", sample_cv_path)
@@ -115,7 +123,12 @@ class TestPDFExtractor:
     async def test_extract_text_empty_pdf(self, sample_cv_path):
         """Test handling of empty PDF"""
         with patch('src.services.pdf_extractor.invoke_pdf_skill', new_callable=AsyncMock) as mock_skill:
-            mock_skill.return_value = ""
+            mock_skill.return_value = {
+                "text": "",
+                "page_count": 1,
+                "tables": [],
+                "metadata": {}
+            }
 
             extractor = PDFExtractor()
             result = await extractor.extract_text(sample_cv_path)
@@ -179,7 +192,12 @@ class TestPDFExtractor:
     async def test_full_extraction_result_structure(self, sample_cv_path, mock_pdf_text):
         """Test complete ExtractionResult data structure"""
         with patch('src.services.pdf_extractor.invoke_pdf_skill', new_callable=AsyncMock) as mock_skill:
-            mock_skill.return_value = mock_pdf_text
+            mock_skill.return_value = {
+                "text": mock_pdf_text,
+                "page_count": 3,
+                "tables": [[[["Name", "Value"], ["Test", "123"]]]],
+                "metadata": {"title": "Professional CV"}
+            }
 
             extractor = PDFExtractor()
             result = await extractor.extract_text(sample_cv_path)
@@ -188,11 +206,93 @@ class TestPDFExtractor:
             assert hasattr(result, 'text')
             assert hasattr(result, 'parsing_confidence')
             assert hasattr(result, 'cv_language')
+            assert hasattr(result, 'tables')
+            assert hasattr(result, 'urls')
+            assert hasattr(result, 'metadata')
 
             # Verify types
             assert isinstance(result.text, str)
             assert isinstance(result.parsing_confidence, float)
             assert isinstance(result.cv_language, str)
+            assert isinstance(result.tables, list)
+            assert isinstance(result.urls, list)
+            assert isinstance(result.metadata, dict)
 
             # Verify cv_language is detected
             assert result.cv_language in ["es", "en"]
+
+    @pytest.mark.asyncio
+    async def test_extract_urls_from_cv(self, sample_cv_path):
+        """Test URL extraction from CV text"""
+        cv_text_with_urls = """
+        Professional CV
+        LinkedIn: https://linkedin.com/in/johndoe
+        GitHub: https://github.com/johndoe
+        Portfolio: www.johndoe.com
+        """
+
+        with patch('src.services.pdf_extractor.invoke_pdf_skill', new_callable=AsyncMock) as mock_skill:
+            mock_skill.return_value = {
+                "text": cv_text_with_urls,
+                "page_count": 1,
+                "tables": [],
+                "metadata": {}
+            }
+
+            extractor = PDFExtractor()
+            result = await extractor.extract_text(sample_cv_path)
+
+            # Verify URLs were extracted
+            assert len(result.urls) >= 2
+            assert any("linkedin.com" in url for url in result.urls)
+            assert any("github.com" in url for url in result.urls)
+
+    @pytest.mark.asyncio
+    async def test_extract_tables_from_pdf(self, sample_cv_path, mock_pdf_text):
+        """Test table extraction from PDF"""
+        sample_table = [
+            ["Skill", "Level", "Years"],
+            ["Python", "Expert", "5"],
+            ["Security", "Advanced", "3"]
+        ]
+
+        with patch('src.services.pdf_extractor.invoke_pdf_skill', new_callable=AsyncMock) as mock_skill:
+            mock_skill.return_value = {
+                "text": mock_pdf_text,
+                "page_count": 1,
+                "tables": [sample_table],
+                "metadata": {}
+            }
+
+            extractor = PDFExtractor()
+            result = await extractor.extract_text(sample_cv_path)
+
+            # Verify tables were extracted
+            assert len(result.tables) > 0
+            assert isinstance(result.tables[0], list)
+            assert result.tables[0] == sample_table
+
+    @pytest.mark.asyncio
+    async def test_metadata_extraction(self, sample_cv_path, mock_pdf_text):
+        """Test PDF metadata extraction"""
+        metadata = {
+            "title": "Cybersecurity Professional CV",
+            "author": "John Doe",
+            "creator": "Microsoft Word"
+        }
+
+        with patch('src.services.pdf_extractor.invoke_pdf_skill', new_callable=AsyncMock) as mock_skill:
+            mock_skill.return_value = {
+                "text": mock_pdf_text,
+                "page_count": 2,
+                "tables": [],
+                "metadata": metadata
+            }
+
+            extractor = PDFExtractor()
+            result = await extractor.extract_text(sample_cv_path)
+
+            # Verify metadata was extracted
+            assert result.metadata == metadata
+            assert result.metadata.get("title") == "Cybersecurity Professional CV"
+            assert result.metadata.get("author") == "John Doe"

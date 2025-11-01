@@ -73,12 +73,14 @@ class CVAnalyzerAgent:
         parsing_confidence: float,
         role_target: str | None = None,
         language: str = "es",
+        tables: list[list[list[str]]] | None = None,
+        urls: list[str] | None = None,
     ) -> CVAnalysisResponse:
         """Analyze a CV using the four-phase agent loop.
 
         Phase 1: Gather Context - Parse CV, extract metadata
         Phase 2: Take Action - Score across 24 parameters
-        Phase 3: Verify Work - Check parsing_confidence, validate schema
+        Phase 3: Verify Work - Validate schema
         Phase 4: Iterate - Refine scoring if needed
 
         Args:
@@ -86,12 +88,13 @@ class CVAnalyzerAgent:
             parsing_confidence: Confidence score from PDF extraction (0.0-1.0)
             role_target: Optional target role for contextualized analysis
             language: Output language (es or en)
+            tables: Optional list of extracted tables from PDF
+            urls: Optional list of URLs extracted from PDF
 
         Returns:
             CVAnalysisResponse with complete analysis
 
         Raises:
-            ValueError: If parsing_confidence is below threshold
             RuntimeError: If Claude API call fails after retries
         """
         start_time = datetime.now(timezone.utc)
@@ -104,16 +107,17 @@ class CVAnalyzerAgent:
             language=language,
         )
 
-        # Phase 1: Gather Context - Validate parsing confidence
-        if parsing_confidence < 0.6:
-            raise ValueError(
-                f"Parsing confidence too low: {parsing_confidence}. "
-                "Please provide a higher quality PDF."
-            )
+        # Phase 1: Gather Context - Log parsing confidence for observability
+        # Note: No longer blocking on low confidence - agent will determine sufficiency
+        logger.info(
+            "parsing_confidence_metadata",
+            parsing_confidence=parsing_confidence,
+            note="Agent will determine content sufficiency",
+        )
 
         # Build the analysis prompt
         system_prompt = self._build_system_prompt(language)
-        user_prompt = self._build_user_prompt(cv_text, role_target, language)
+        user_prompt = self._build_user_prompt(cv_text, role_target, language, tables, urls)
 
         # Phase 2: Take Action - Call Claude API for analysis
         logger.info("calling_claude_api", model=self.model)
@@ -183,7 +187,12 @@ Analyze CVs of cybersecurity professionals evaluating 24 specific parameters: ce
 Provide scores from 0.0 to 10.0 for each parameter with detailed justifications based on concrete CV evidence."""
 
     def _build_user_prompt(
-        self, cv_text: str, role_target: str | None, language: str
+        self,
+        cv_text: str,
+        role_target: str | None,
+        language: str,
+        tables: list[list[list[str]]] | None = None,
+        urls: list[str] | None = None,
     ) -> str:
         """Build the user prompt for CV analysis.
 
@@ -191,6 +200,8 @@ Provide scores from 0.0 to 10.0 for each parameter with detailed justifications 
             cv_text: Extracted CV text
             role_target: Optional target role
             language: Output language
+            tables: Optional list of extracted tables
+            urls: Optional list of extracted URLs
 
         Returns:
             User prompt string
@@ -201,8 +212,23 @@ Provide scores from 0.0 to 10.0 for each parameter with detailed justifications 
 {cv_text}
 
 """
+            # Add enriched content if available
+            if tables:
+                base_prompt += f"\n\nTABLAS ESTRUCTURADAS EXTRAÍDAS ({len(tables)} encontradas):\n"
+                for i, table in enumerate(tables[:3], 1):  # Max 3 tables
+                    base_prompt += f"Tabla {i}: {table}\n"
+                if len(tables) > 3:
+                    base_prompt += f"... y {len(tables) - 3} tabla(s) más.\n"
+
+            if urls:
+                base_prompt += f"\n\nENLACES EXTERNOS ENCONTRADOS ({len(urls)}):\n"
+                base_prompt += "\n".join(urls[:10])  # Max 10 URLs
+                if len(urls) > 10:
+                    base_prompt += f"\n... y {len(urls) - 10} URL(s) más."
+                base_prompt += "\n"
+
             if role_target:
-                base_prompt += f"Contexto: El candidato está siendo evaluado para el puesto de {role_target}.\n\n"
+                base_prompt += f"\nContexto: El candidato está siendo evaluado para el puesto de {role_target}.\n\n"
 
             base_prompt += """Responde ÚNICAMENTE con un objeto JSON válido (sin markdown, sin ```json).
 
@@ -250,8 +276,23 @@ IMPORTANTE: Mantén las justificaciones breves y concisas (máximo 2 frases cada
 {cv_text}
 
 """
+            # Add enriched content if available
+            if tables:
+                base_prompt += f"\n\nEXTRACTED STRUCTURED TABLES ({len(tables)} found):\n"
+                for i, table in enumerate(tables[:3], 1):  # Max 3 tables
+                    base_prompt += f"Table {i}: {table}\n"
+                if len(tables) > 3:
+                    base_prompt += f"... and {len(tables) - 3} more table(s).\n"
+
+            if urls:
+                base_prompt += f"\n\nEXTERNAL LINKS FOUND ({len(urls)}):\n"
+                base_prompt += "\n".join(urls[:10])  # Max 10 URLs
+                if len(urls) > 10:
+                    base_prompt += f"\n... and {len(urls) - 10} more URL(s)."
+                base_prompt += "\n"
+
             if role_target:
-                base_prompt += f"Context: The candidate is being evaluated for the position of {role_target}.\n\n"
+                base_prompt += f"\nContext: The candidate is being evaluated for the position of {role_target}.\n\n"
 
             base_prompt += """Respond ONLY with a valid JSON object (no markdown, no ```json).
 

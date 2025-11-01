@@ -4,26 +4,27 @@ This module provides functionality for extracting text from PDF CVs
 and calculating parsing confidence scores.
 """
 
-from dataclasses import dataclass
+import re
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TypedDict
+from typing import Any
 
 import structlog
 
 logger = structlog.get_logger(__name__)
 
 
-# PDF text extraction using pypdf
-async def invoke_pdf_skill(operation: str, file_path: Path) -> str:
+# PDF text extraction using pdfplumber
+async def invoke_pdf_skill(operation: str, file_path: Path) -> dict:
     """
-    Extract text from PDF using pypdf library.
+    Extract text and metadata from PDF using pdfplumber library.
 
     Args:
         operation: The operation to perform (e.g., "extract_text")
         file_path: Path to the PDF file
 
     Returns:
-        Extracted text from the PDF
+        Dictionary containing extracted text, page count, tables, and metadata
 
     Raises:
         ValueError: If operation is not supported or PDF is invalid
@@ -32,15 +33,33 @@ async def invoke_pdf_skill(operation: str, file_path: Path) -> str:
         raise ValueError(f"Unsupported operation: {operation}")
 
     try:
-        from pypdf import PdfReader
+        import pdfplumber
 
-        reader = PdfReader(str(file_path))
-        text = ""
+        with pdfplumber.open(str(file_path)) as pdf:
+            # Extract text from all pages
+            text = ""
+            for page in pdf.pages:
+                page_text = page.extract_text()
+                if page_text:
+                    text += page_text + "\n"
 
-        for page in reader.pages:
-            text += page.extract_text() + "\n"
+            # Extract tables from all pages
+            tables = []
+            for page in pdf.pages:
+                page_tables = page.extract_tables()
+                if page_tables:
+                    tables.extend(page_tables)
 
-        return text.strip()
+            # Extract metadata
+            page_count = len(pdf.pages)
+            metadata = pdf.metadata or {}
+
+            return {
+                "text": text.strip(),
+                "page_count": page_count,
+                "tables": tables,
+                "metadata": metadata,
+            }
     except Exception as e:
         logger.error("pdf_extraction_failed", file_path=str(file_path), error=str(e))
         raise ValueError(f"Failed to extract text from PDF: {e}") from e
@@ -48,13 +67,16 @@ async def invoke_pdf_skill(operation: str, file_path: Path) -> str:
 
 @dataclass
 class PDFExtractionResult:
-    """Result of PDF text extraction."""
+    """Result of PDF text extraction with enriched content."""
 
     text: str
     parsing_confidence: float
     page_count: int
     char_count: int
     cv_language: str
+    tables: list[list[list[str]]] = field(default_factory=list)
+    urls: list[str] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 # Alias for backward compatibility with tests
@@ -184,21 +206,32 @@ async def extract_text_from_pdf(file_path: Path) -> PDFExtractionResult:
     file_size = file_path.stat().st_size
     logger.debug("pdf_file_size", file_size_bytes=file_size)
 
-    # Extract text using pdf skill
-    extracted_text = await invoke_pdf_skill("extract_text", file_path)
+    # Extract text using pdf skill with enriched content
+    extraction_data = await invoke_pdf_skill("extract_text", file_path)
+
+    extracted_text = extraction_data["text"]
+    page_count = extraction_data["page_count"]
+    tables = extraction_data["tables"]
+    metadata = extraction_data["metadata"]
 
     # Calculate parsing confidence
-    confidence = calculate_parsing_confidence(extracted_text, page_count=1)
+    confidence = calculate_parsing_confidence(extracted_text, page_count=page_count)
 
     # Detect language
     language = detect_language(extracted_text)
 
+    # Extract URLs from text
+    urls = extract_urls(extracted_text)
+
     result = PDFExtractionResult(
         text=extracted_text,
         parsing_confidence=confidence,
-        page_count=1,  # Will be from pdf skill
+        page_count=page_count,
         char_count=len(extracted_text),
         cv_language=language,
+        tables=tables,
+        urls=urls,
+        metadata=metadata,
     )
 
     logger.info(
@@ -207,13 +240,19 @@ async def extract_text_from_pdf(file_path: Path) -> PDFExtractionResult:
         page_count=result.page_count,
         confidence=result.parsing_confidence,
         language=result.cv_language,
+        table_count=len(tables),
+        url_count=len(urls),
+        has_metadata=bool(metadata),
     )
 
     return result
 
 
 def calculate_parsing_confidence(text: str, page_count: int = 1) -> float:
-    """Calculate parsing confidence score based on text characteristics.
+    """Calculate parsing confidence score for observability metrics.
+
+    This score is used for logging and monitoring, NOT for rejecting CVs.
+    The agent will make the final determination of content sufficiency.
 
     The confidence score is based on:
     - Text length (longer text = higher confidence)
@@ -226,7 +265,7 @@ def calculate_parsing_confidence(text: str, page_count: int = 1) -> float:
         page_count: Number of pages in the PDF
 
     Returns:
-        Confidence score between 0.0 and 1.0
+        Confidence score between 0.0 and 1.0 (informational only)
     """
     if not text or len(text.strip()) == 0:
         return 0.0
@@ -299,6 +338,42 @@ def calculate_parsing_confidence(text: str, page_count: int = 1) -> float:
     )
 
     return round(confidence, 2)
+
+
+def extract_urls(text: str) -> list[str]:
+    """Extract URLs from text.
+
+    Extracts both http/https URLs and www. prefixed URLs.
+
+    Args:
+        text: Text to extract URLs from
+
+    Returns:
+        List of unique URLs found in the text
+    """
+    if not text:
+        return []
+
+    # Pattern to match http/https URLs and www. URLs
+    url_pattern = r"https?://[^\s]+|www\.[^\s]+"
+    urls = re.findall(url_pattern, text)
+
+    # Remove trailing punctuation that might be captured
+    cleaned_urls = []
+    for url in urls:
+        # Remove common trailing punctuation
+        url = url.rstrip(".,;:!?)")
+        cleaned_urls.append(url)
+
+    # Return unique URLs, preserving order
+    seen = set()
+    unique_urls = []
+    for url in cleaned_urls:
+        if url not in seen:
+            seen.add(url)
+            unique_urls.append(url)
+
+    return unique_urls
 
 
 def detect_language(text: str) -> str:

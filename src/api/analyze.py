@@ -248,6 +248,8 @@ async def analyze_cv(
             cv_text = extraction_result.text
             parsing_confidence = extraction_result.parsing_confidence
             page_count = extraction_result.page_count
+            tables = extraction_result.tables
+            urls = extraction_result.urls
 
             logger.info(
                 "pdf_extraction_complete",
@@ -255,6 +257,8 @@ async def analyze_cv(
                 char_count=extraction_result.char_count,
                 page_count=page_count,
                 parsing_confidence=parsing_confidence,
+                table_count=len(tables),
+                url_count=len(urls),
             )
 
         except FileNotFoundError as e:
@@ -277,23 +281,16 @@ async def analyze_cv(
                 },
             ) from e
 
-        # Check parsing confidence
+        # Log parsing confidence for observability (no longer blocks processing)
         if parsing_confidence < MIN_PARSING_CONFIDENCE:
             logger.warning(
-                "low_parsing_confidence",
+                "low_parsing_confidence_detected",
                 request_id=request_id,
                 parsing_confidence=parsing_confidence,
                 threshold=MIN_PARSING_CONFIDENCE,
+                action="proceeding_with_agent_validation",
             )
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail={
-                    "detail": f"Low text extraction quality ({parsing_confidence:.2f}). "
-                    "Please provide a digital PDF or higher quality scan.",
-                    "error_code": "LOW_PARSING_QUALITY",
-                    "parsing_confidence": parsing_confidence,
-                },
-            )
+            # Note: No longer raising exception - agent will determine content sufficiency
 
         # Initialize agent and analyze CV with timeout enforcement
         try:
@@ -307,6 +304,8 @@ async def analyze_cv(
                         parsing_confidence=parsing_confidence,
                         role_target=role_target,
                         language=language,
+                        tables=tables,
+                        urls=urls,
                     ),
                     timeout=settings.analysis_timeout_seconds,
                 )
