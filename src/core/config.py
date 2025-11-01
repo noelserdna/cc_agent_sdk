@@ -42,6 +42,20 @@ class Settings(BaseSettings):
         default=8192, description="Maximum tokens per request", ge=1000, le=100000
     )
 
+    # Agent SDK Advanced Configuration
+    agent_setting_sources: list[str] = Field(
+        default=["user", "project"],
+        description="Sources for loading Agent SDK settings and skills"
+    )
+    agent_allowed_tools: list[str] = Field(
+        default=["Skill"],
+        description="Tools allowed for the Agent SDK"
+    )
+    agent_cwd: str = Field(
+        default=".",
+        description="Working directory for Agent SDK"
+    )
+
     # File Upload Configuration
     max_file_size_mb: int = Field(
         default=10, description="Maximum file size in megabytes", ge=1, le=100

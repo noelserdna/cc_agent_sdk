@@ -12,6 +12,7 @@ pydantic-settings>=2.5.0
 
 # Claude Agent SDK
 anthropic>=0.40.0
+claude-agent-sdk>=1.0.0
 
 # Logging
 structlog>=24.4.0

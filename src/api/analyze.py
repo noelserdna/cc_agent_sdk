@@ -18,7 +18,6 @@ from src.core.config import Settings, get_settings
 from src.models.response import CVAnalysisResponse
 from src.services.agent.cv_analyzer_agent import CVAnalyzerAgent
 from src.services.api_auth import validate_api_key
-from src.services.pdf_extractor import extract_text_from_pdf
 
 logger = structlog.get_logger(__name__)
 
@@ -27,7 +26,6 @@ router = APIRouter(prefix="/v1", tags=["analysis"])
 # Constants
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
 ALLOWED_CONTENT_TYPE = "application/pdf"
-MIN_PARSING_CONFIDENCE = 0.6
 
 
 @router.post(
@@ -242,57 +240,8 @@ async def analyze_cv(
             temp_file_path=str(temp_file_path),
         )
 
-        # Extract text from PDF
-        try:
-            extraction_result = await extract_text_from_pdf(temp_file_path)
-            cv_text = extraction_result.text
-            parsing_confidence = extraction_result.parsing_confidence
-            page_count = extraction_result.page_count
-            tables = extraction_result.tables
-            urls = extraction_result.urls
-
-            logger.info(
-                "pdf_extraction_complete",
-                request_id=request_id,
-                char_count=extraction_result.char_count,
-                page_count=page_count,
-                parsing_confidence=parsing_confidence,
-                table_count=len(tables),
-                url_count=len(urls),
-            )
-
-        except FileNotFoundError as e:
-            logger.error("pdf_file_not_found", request_id=request_id, error=str(e))
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail={
-                    "detail": "Internal error processing file",
-                    "error_code": "INTERNAL_ERROR",
-                },
-            ) from e
-
-        except ValueError as e:
-            logger.warning("pdf_extraction_error", request_id=request_id, error=str(e))
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail={
-                    "detail": str(e),
-                    "error_code": "INVALID_PDF",
-                },
-            ) from e
-
-        # Log parsing confidence for observability (no longer blocks processing)
-        if parsing_confidence < MIN_PARSING_CONFIDENCE:
-            logger.warning(
-                "low_parsing_confidence_detected",
-                request_id=request_id,
-                parsing_confidence=parsing_confidence,
-                threshold=MIN_PARSING_CONFIDENCE,
-                action="proceeding_with_agent_validation",
-            )
-            # Note: No longer raising exception - agent will determine content sufficiency
-
         # Initialize agent and analyze CV with timeout enforcement
+        # The Agent SDK internally uses the 'pdf' skill for extraction
         try:
             agent = CVAnalyzerAgent(settings)
 
@@ -300,12 +249,9 @@ async def analyze_cv(
             try:
                 analysis_result = await asyncio.wait_for(
                     agent.analyze_cv(
-                        cv_text=cv_text,
-                        parsing_confidence=parsing_confidence,
+                        pdf_path=str(temp_file_path),
                         role_target=role_target,
                         language=language,
-                        tables=tables,
-                        urls=urls,
                     ),
                     timeout=settings.analysis_timeout_seconds,
                 )

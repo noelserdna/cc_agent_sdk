@@ -13,9 +13,8 @@ import re
 from datetime import datetime, timezone
 from typing import Any
 
-import httpx
 import structlog
-from anthropic import AsyncAnthropic
+from claude_agent_sdk import query, ClaudeAgentOptions
 
 from src.core.config import Settings
 from src.models.candidate import CandidateSummary, YearsExperience
@@ -41,121 +40,106 @@ class CVAnalyzerAgent:
         """
         self.settings = settings
 
-        # Configure HTTP timeout for Claude API calls
-        # - connect: 10s to establish connection
-        # - read: 60s to wait for response (model generation time)
-        # - write: 10s to send request
-        # - pool: 10s to acquire connection from pool
-        timeout = httpx.Timeout(
-            connect=10.0,
-            read=60.0,
-            write=10.0,
-            pool=10.0,
-        )
-
-        self.client = AsyncAnthropic(
-            api_key=settings.anthropic_api_key,
-            timeout=timeout,
-        )
-        self.model = settings.claude_model
-        self.max_tokens = settings.claude_max_tokens
-
         logger.info(
             "cv_analyzer_agent_initialized",
-            model=self.model,
-            max_tokens=self.max_tokens,
-            timeout_read=60,
+            model=settings.claude_model,
+            max_tokens=settings.claude_max_tokens,
+            agent_setting_sources=settings.agent_setting_sources,
+            agent_allowed_tools=settings.agent_allowed_tools,
         )
 
     async def analyze_cv(
         self,
-        cv_text: str,
-        parsing_confidence: float,
+        pdf_path: str,
         role_target: str | None = None,
         language: str = "es",
-        tables: list[list[list[str]]] | None = None,
-        urls: list[str] | None = None,
     ) -> CVAnalysisResponse:
-        """Analyze a CV using the four-phase agent loop.
+        """Analyze a CV using Agent SDK with Skills.
 
-        Phase 1: Gather Context - Parse CV, extract metadata
-        Phase 2: Take Action - Score across 24 parameters
-        Phase 3: Verify Work - Validate schema
-        Phase 4: Iterate - Refine scoring if needed
+        Flujo:
+        1. Skill 'pdf' extrae contenido del PDF
+        2. Skill 'cybersecurity-cv-analyzer' analiza el contenido
 
         Args:
-            cv_text: Extracted text from the CV PDF
-            parsing_confidence: Confidence score from PDF extraction (0.0-1.0)
+            pdf_path: Path to the CV PDF file
             role_target: Optional target role for contextualized analysis
             language: Output language (es or en)
-            tables: Optional list of extracted tables from PDF
-            urls: Optional list of URLs extracted from PDF
 
         Returns:
             CVAnalysisResponse with complete analysis
 
         Raises:
-            RuntimeError: If Claude API call fails after retries
+            RuntimeError: If Agent SDK query fails
         """
         start_time = datetime.now(timezone.utc)
 
         logger.info(
-            "starting_cv_analysis",
-            text_length=len(cv_text),
-            parsing_confidence=parsing_confidence,
+            "starting_cv_analysis_with_agent_sdk",
+            pdf_path=pdf_path,
             role_target=role_target,
             language=language,
         )
 
-        # Phase 1: Gather Context - Log parsing confidence for observability
-        # Note: No longer blocking on low confidence - agent will determine sufficiency
-        logger.info(
-            "parsing_confidence_metadata",
-            parsing_confidence=parsing_confidence,
-            note="Agent will determine content sufficiency",
+        # Configure Agent SDK options
+        options = ClaudeAgentOptions(
+            cwd=self.settings.agent_cwd,
+            setting_sources=self.settings.agent_setting_sources,
+            allowed_tools=self.settings.agent_allowed_tools,
+            model=self.settings.claude_model,
+            max_tokens=self.settings.claude_max_tokens,
         )
 
-        # Build the analysis prompt
-        system_prompt = self._build_system_prompt(language)
-        user_prompt = self._build_user_prompt(cv_text, role_target, language, tables, urls)
+        # Build guided prompt for the 2-step flow
+        if language == "es":
+            prompt = f"""Analiza este CV de ciberseguridad usando el siguiente flujo:
 
-        # Phase 2: Take Action - Call Claude API for analysis
-        logger.info("calling_claude_api", model=self.model)
+1. Usa la skill 'pdf' para extraer el contenido del archivo: {pdf_path}
+2. Usa la skill 'cybersecurity-cv-analyzer' para analizar el contenido extraído
+
+Idioma del análisis: {language}
+{f"Puesto objetivo: {role_target}" if role_target else ""}
+
+Retorna el análisis completo en formato JSON estructurado según el esquema de la skill."""
+        else:
+            prompt = f"""Analyze this cybersecurity CV using the following flow:
+
+1. Use the 'pdf' skill to extract the content from file: {pdf_path}
+2. Use the 'cybersecurity-cv-analyzer' skill to analyze the extracted content
+
+Analysis language: {language}
+{f"Target role: {role_target}" if role_target else ""}
+
+Return the complete analysis in structured JSON format according to the skill schema."""
+
+        # Execute Agent SDK query
+        logger.info("executing_agent_sdk_query", model=self.settings.claude_model)
 
         try:
-            response = await self.client.messages.create(
-                model=self.model,
-                max_tokens=self.max_tokens,
-                system=system_prompt,
-                messages=[{"role": "user", "content": user_prompt}],
-                temperature=0.3,  # Lower temperature for consistent analysis
-            )
+            response_text = ""
+            async for message in query(prompt=prompt, options=options):
+                response_text += message
 
-            analysis_text = response.content[0].text
             logger.info(
-                "claude_api_response_received",
-                response_length=len(analysis_text),
-                input_tokens=response.usage.input_tokens,
-                output_tokens=response.usage.output_tokens,
+                "agent_sdk_response_received",
+                response_length=len(response_text),
             )
 
         except Exception as e:
-            logger.error("claude_api_error", error=str(e), error_type=type(e).__name__)
-            raise RuntimeError(f"Claude API call failed: {e}") from e
+            logger.error("agent_sdk_error", error=str(e), error_type=type(e).__name__)
+            raise RuntimeError(f"Agent SDK query failed: {e}") from e
 
-        # Phase 3: Verify Work - Parse and validate the response
-        # TODO: Implement structured output parsing
-        # For now, we'll create a placeholder response
+        # Parse and validate response - use existing parsing logic
+        # Assume parsing_confidence = 1.0 since the pdf skill handles extraction
         analysis_result = self._parse_analysis_response(
-            analysis_text, cv_text, parsing_confidence
+            response_text, cv_content="", parsing_confidence=1.0
         )
-
-        # Phase 4: Iterate - Check if refinement is needed
-        # (For MVP, we accept the first analysis)
 
         # Calculate processing duration
         end_time = datetime.now(timezone.utc)
         processing_duration_ms = int((end_time - start_time).total_seconds() * 1000)
+
+        # Update metadata with actual processing time
+        analysis_result.analysis_metadata.processing_duration_ms = processing_duration_ms
 
         logger.info(
             "cv_analysis_complete",
@@ -166,184 +150,14 @@ class CVAnalyzerAgent:
 
         return analysis_result
 
-    def _build_system_prompt(self, language: str) -> str:
-        """Build the system prompt for the Claude agent.
-
-        Args:
-            language: Output language (es or en)
-
-        Returns:
-            System prompt string
-        """
-        if language == "es":
-            return """Eres un experto reclutador técnico especializado en ciberseguridad.
-Analiza CVs de profesionales de ciberseguridad evaluando 24 parámetros específicos: certificaciones, habilidades ofensivas/defensivas, gobernanza, cloud security, herramientas, programación, arquitectura, educación, soft skills, idiomas, DevSecOps, forense digital, criptografía, OT/ICS, mobile/IoT, threat intelligence, contribuciones open source, publicaciones, gestión de equipos, gestión de crisis, transformación digital, especialidades de nicho, y experiencia.
-
-Proporciona puntuaciones de 0.0 a 10.0 para cada parámetro con justificaciones detalladas basadas en evidencia concreta del CV."""
-        else:
-            return """You are an expert technical recruiter specialized in cybersecurity.
-Analyze CVs of cybersecurity professionals evaluating 24 specific parameters: certifications, offensive/defensive skills, governance, cloud security, tools, programming, architecture, education, soft skills, languages, DevSecOps, digital forensics, cryptography, OT/ICS, mobile/IoT, threat intelligence, open source contributions, publications, team management, crisis management, digital transformation, niche specialties, and experience.
-
-Provide scores from 0.0 to 10.0 for each parameter with detailed justifications based on concrete CV evidence."""
-
-    def _build_user_prompt(
-        self,
-        cv_text: str,
-        role_target: str | None,
-        language: str,
-        tables: list[list[list[str]]] | None = None,
-        urls: list[str] | None = None,
-    ) -> str:
-        """Build the user prompt for CV analysis.
-
-        Args:
-            cv_text: Extracted CV text
-            role_target: Optional target role
-            language: Output language
-            tables: Optional list of extracted tables
-            urls: Optional list of extracted URLs
-
-        Returns:
-            User prompt string
-        """
-        if language == "es":
-            base_prompt = f"""Analiza el siguiente CV de un profesional de ciberseguridad:
-
-{cv_text}
-
-"""
-            # Add enriched content if available
-            if tables:
-                base_prompt += f"\n\nTABLAS ESTRUCTURADAS EXTRAÍDAS ({len(tables)} encontradas):\n"
-                for i, table in enumerate(tables[:3], 1):  # Max 3 tables
-                    base_prompt += f"Tabla {i}: {table}\n"
-                if len(tables) > 3:
-                    base_prompt += f"... y {len(tables) - 3} tabla(s) más.\n"
-
-            if urls:
-                base_prompt += f"\n\nENLACES EXTERNOS ENCONTRADOS ({len(urls)}):\n"
-                base_prompt += "\n".join(urls[:10])  # Max 10 URLs
-                if len(urls) > 10:
-                    base_prompt += f"\n... y {len(urls) - 10} URL(s) más."
-                base_prompt += "\n"
-
-            if role_target:
-                base_prompt += f"\nContexto: El candidato está siendo evaluado para el puesto de {role_target}.\n\n"
-
-            base_prompt += """Responde ÚNICAMENTE con un objeto JSON válido (sin markdown, sin ```json).
-
-Estructura JSON requerida:
-{
-  "candidate": {"name": "str", "detected_role": "str", "seniority_level": "Junior|Mid|Senior|Lead|Executive", "years_experience": {"total_it": num, "cybersecurity": num, "current_role": num}},
-  "parameters": {
-    "certifications": {"score": 0-10, "justification": "1-2 frases concisas"},
-    "offensive_skills": {"score": 0-10, "justification": "1-2 frases concisas"},
-    "defensive_skills": {"score": 0-10, "justification": "1-2 frases concisas"},
-    "governance": {"score": 0-10, "justification": "1-2 frases concisas"},
-    "cloud_security": {"score": 0-10, "justification": "1-2 frases concisas"},
-    "tools": {"score": 0-10, "justification": "1-2 frases concisas"},
-    "programming": {"score": 0-10, "justification": "1-2 frases concisas"},
-    "architecture": {"score": 0-10, "justification": "1-2 frases concisas"},
-    "education": {"score": 0-10, "justification": "1-2 frases concisas"},
-    "soft_skills": {"score": 0-10, "justification": "1-2 frases concisas"},
-    "languages": {"score": 0-10, "justification": "1-2 frases concisas"},
-    "devsecops": {"score": 0-10, "justification": "1-2 frases concisas"},
-    "forensics": {"score": 0-10, "justification": "1-2 frases concisas"},
-    "cryptography": {"score": 0-10, "justification": "1-2 frases concisas"},
-    "ot_ics": {"score": 0-10, "justification": "1-2 frases concisas"},
-    "mobile_iot": {"score": 0-10, "justification": "1-2 frases concisas"},
-    "threat_intel": {"score": 0-10, "justification": "1-2 frases concisas"},
-    "contributions": {"score": 0-10, "justification": "1-2 frases concisas"},
-    "publications": {"score": 0-10, "justification": "1-2 frases concisas"},
-    "management": {"score": 0-10, "justification": "1-2 frases concisas"},
-    "crisis": {"score": 0-10, "justification": "1-2 frases concisas"},
-    "transformation": {"score": 0-10, "justification": "1-2 frases concisas"},
-    "niche_specialties": {"score": 0-10, "justification": "1-2 frases concisas"},
-    "experience": {"score": 0-10, "justification": "1-2 frases concisas"}
-  },
-  "strengths": [{"area": "str", "description": "texto breve", "score": 7-10, "market_value": "high|medium|low"}],
-  "improvement_areas": [{"area": "str", "current_score": 0-10, "gap_description": "texto breve", "recommendations": ["acción"], "priority": "high|medium|low"}],
-  "red_flags": [{"type": "employment_gap|certification_mismatch|skill_inconsistency|frequent_job_changes|missing_fundamentals|unclear_progression", "severity": "low|medium|high", "description": "texto breve", "impact": "texto breve"}],
-  "recommendations": {"certifications": ["str"], "training": ["str"], "experience_areas": ["str"], "next_role_suggestions": ["str"]},
-  "interview_questions": {"technical": ["pregunta"], "scenario": ["pregunta"], "verification": ["pregunta"]}
-}
-
-IMPORTANTE: Mantén las justificaciones breves y concisas (máximo 2 frases cada una). Sé específico y objetivo."""
-
-        else:
-            base_prompt = f"""Analyze the following cybersecurity professional's CV:
-
-{cv_text}
-
-"""
-            # Add enriched content if available
-            if tables:
-                base_prompt += f"\n\nEXTRACTED STRUCTURED TABLES ({len(tables)} found):\n"
-                for i, table in enumerate(tables[:3], 1):  # Max 3 tables
-                    base_prompt += f"Table {i}: {table}\n"
-                if len(tables) > 3:
-                    base_prompt += f"... and {len(tables) - 3} more table(s).\n"
-
-            if urls:
-                base_prompt += f"\n\nEXTERNAL LINKS FOUND ({len(urls)}):\n"
-                base_prompt += "\n".join(urls[:10])  # Max 10 URLs
-                if len(urls) > 10:
-                    base_prompt += f"\n... and {len(urls) - 10} more URL(s)."
-                base_prompt += "\n"
-
-            if role_target:
-                base_prompt += f"\nContext: The candidate is being evaluated for the position of {role_target}.\n\n"
-
-            base_prompt += """Respond ONLY with a valid JSON object (no markdown, no ```json).
-
-Required JSON structure:
-{
-  "candidate": {"name": "str", "detected_role": "str", "seniority_level": "Junior|Mid|Senior|Lead|Executive", "years_experience": {"total_it": num, "cybersecurity": num, "current_role": num}},
-  "parameters": {
-    "certifications": {"score": 0-10, "justification": "1-2 concise sentences"},
-    "offensive_skills": {"score": 0-10, "justification": "1-2 concise sentences"},
-    "defensive_skills": {"score": 0-10, "justification": "1-2 concise sentences"},
-    "governance": {"score": 0-10, "justification": "1-2 concise sentences"},
-    "cloud_security": {"score": 0-10, "justification": "1-2 concise sentences"},
-    "tools": {"score": 0-10, "justification": "1-2 concise sentences"},
-    "programming": {"score": 0-10, "justification": "1-2 concise sentences"},
-    "architecture": {"score": 0-10, "justification": "1-2 concise sentences"},
-    "education": {"score": 0-10, "justification": "1-2 concise sentences"},
-    "soft_skills": {"score": 0-10, "justification": "1-2 concise sentences"},
-    "languages": {"score": 0-10, "justification": "1-2 concise sentences"},
-    "devsecops": {"score": 0-10, "justification": "1-2 concise sentences"},
-    "forensics": {"score": 0-10, "justification": "1-2 concise sentences"},
-    "cryptography": {"score": 0-10, "justification": "1-2 concise sentences"},
-    "ot_ics": {"score": 0-10, "justification": "1-2 concise sentences"},
-    "mobile_iot": {"score": 0-10, "justification": "1-2 concise sentences"},
-    "threat_intel": {"score": 0-10, "justification": "1-2 concise sentences"},
-    "contributions": {"score": 0-10, "justification": "1-2 concise sentences"},
-    "publications": {"score": 0-10, "justification": "1-2 concise sentences"},
-    "management": {"score": 0-10, "justification": "1-2 concise sentences"},
-    "crisis": {"score": 0-10, "justification": "1-2 concise sentences"},
-    "transformation": {"score": 0-10, "justification": "1-2 concise sentences"},
-    "niche_specialties": {"score": 0-10, "justification": "1-2 concise sentences"},
-    "experience": {"score": 0-10, "justification": "1-2 concise sentences"}
-  },
-  "strengths": [{"area": "str", "description": "brief text", "score": 7-10, "market_value": "high|medium|low"}],
-  "improvement_areas": [{"area": "str", "current_score": 0-10, "gap_description": "brief text", "recommendations": ["action"], "priority": "high|medium|low"}],
-  "red_flags": [{"type": "employment_gap|certification_mismatch|skill_inconsistency|frequent_job_changes|missing_fundamentals|unclear_progression", "severity": "low|medium|high", "description": "brief text", "impact": "brief text"}],
-  "recommendations": {"certifications": ["str"], "training": ["str"], "experience_areas": ["str"], "next_role_suggestions": ["str"]},
-  "interview_questions": {"technical": ["question"], "scenario": ["question"], "verification": ["question"]}
-}
-
-IMPORTANT: Keep justifications brief and concise (maximum 2 sentences each). Be specific and objective."""
-
-        return base_prompt
-
     def _parse_analysis_response(
-        self, analysis_text: str, cv_text: str, parsing_confidence: float
+        self, analysis_text: str, cv_content: str, parsing_confidence: float
     ) -> CVAnalysisResponse:
-        """Parse the Claude API response into structured format.
+        """Parse the Agent SDK response into structured format.
 
         Args:
-            analysis_text: Raw text response from Claude (should be JSON)
-            cv_text: Original CV text
+            analysis_text: Raw text response from Agent SDK (should be JSON)
+            cv_content: Original CV text (optional, used for legacy compatibility)
             parsing_confidence: Confidence score from PDF extraction
 
         Returns:
