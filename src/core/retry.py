@@ -5,12 +5,11 @@ This module provides configurable retry decorators for Claude API calls
 with exponential backoff, timeout enforcement, and structured logging.
 """
 
-import functools
 from collections.abc import Callable
 from typing import Any, TypeVar
 
-from anthropic import APIStatusError
 from anthropic import APIError as AnthropicAPIError
+from anthropic import APIStatusError
 from anthropic import RateLimitError as AnthropicRateLimitError
 from tenacity import (
     retry,

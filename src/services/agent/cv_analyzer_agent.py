@@ -8,13 +8,13 @@ using the four-phase agent feedback loop:
 4. Iterate: Refine scoring if needed
 """
 
+from datetime import UTC, datetime
 import json
 import re
-from datetime import datetime, timezone
 from typing import Any
 
+from claude_agent_sdk import ClaudeAgentOptions, query
 import structlog
-from claude_agent_sdk import query, ClaudeAgentOptions
 
 from src.core.config import Settings
 from src.models.candidate import CandidateSummary, YearsExperience
@@ -71,7 +71,7 @@ class CVAnalyzerAgent:
         Raises:
             RuntimeError: If Agent SDK query fails
         """
-        start_time = datetime.now(timezone.utc)
+        start_time = datetime.now(UTC)
 
         logger.info(
             "starting_cv_analysis_with_agent_sdk",
@@ -135,7 +135,7 @@ Return the complete analysis in structured JSON format according to the skill sc
         )
 
         # Calculate processing duration
-        end_time = datetime.now(timezone.utc)
+        end_time = datetime.now(UTC)
         processing_duration_ms = int((end_time - start_time).total_seconds() * 1000)
 
         # Update metadata with actual processing time
@@ -151,7 +151,7 @@ Return the complete analysis in structured JSON format according to the skill sc
         return analysis_result
 
     def _parse_analysis_response(
-        self, analysis_text: str, cv_content: str, parsing_confidence: float
+        self, analysis_text: str, _cv_content: str, parsing_confidence: float
     ) -> CVAnalysisResponse:
         """Parse the Agent SDK response into structured format.
 
@@ -260,7 +260,7 @@ Return the complete analysis in structured JSON format according to the skill sc
 
         # Create metadata
         metadata = AnalysisMetadata(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             parsing_confidence=parsing_confidence,
             cv_language="es",  # TODO: detect from CV text
             analysis_version="1.0.0",
@@ -355,7 +355,7 @@ Return the complete analysis in structured JSON format according to the skill sc
         # Get all parameter scores as dictionary
         scores_dict = detailed_scores.model_dump()
 
-        for param_name, param_data in scores_dict.items():
+        for _param_name, param_data in scores_dict.items():
             score = param_data["score"]
             weight = param_data["weight"]
             total_weighted += score * weight

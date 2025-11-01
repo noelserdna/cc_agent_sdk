@@ -5,7 +5,8 @@ This module provides API key validation middleware and utilities for
 securing the CV Cybersecurity Analyzer API endpoints.
 """
 
-from typing import Annotated, Callable
+from collections.abc import Callable
+from typing import Annotated
 
 from fastapi import Header, HTTPException, Request, status
 from fastapi.security import APIKeyHeader

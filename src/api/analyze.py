@@ -5,14 +5,13 @@ and analyzing cybersecurity CVs.
 """
 
 import asyncio
-import tempfile
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
+import tempfile
 from typing import Annotated, Literal
 
-import structlog
 from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, UploadFile, status
-from fastapi.responses import JSONResponse
+import structlog
 
 from src.core.config import Settings, get_settings
 from src.models.response import CVAnalysisResponse
@@ -149,8 +148,8 @@ async def analyze_cv(
     Raises:
         HTTPException: Various status codes for different error conditions
     """
-    request_id = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S%f")
-    start_time = datetime.now(timezone.utc)
+    request_id = datetime.now(UTC).strftime("%Y%m%d%H%M%S%f")
+    start_time = datetime.now(UTC)
 
     logger.info(
         "cv_analysis_request_received",
@@ -255,12 +254,12 @@ async def analyze_cv(
                     ),
                     timeout=settings.analysis_timeout_seconds,
                 )
-            except asyncio.TimeoutError as timeout_err:
+            except TimeoutError as timeout_err:
                 logger.error(
                     "analysis_timeout",
                     request_id=request_id,
                     timeout_seconds=settings.analysis_timeout_seconds,
-                    elapsed_seconds=(datetime.now(timezone.utc) - start_time).total_seconds(),
+                    elapsed_seconds=(datetime.now(UTC) - start_time).total_seconds(),
                 )
                 raise HTTPException(
                     status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -273,7 +272,7 @@ async def analyze_cv(
                 ) from timeout_err
 
             # Update processing duration in metadata
-            end_time = datetime.now(timezone.utc)
+            end_time = datetime.now(UTC)
             processing_duration_ms = int((end_time - start_time).total_seconds() * 1000)
             analysis_result.analysis_metadata.processing_duration_ms = processing_duration_ms
 

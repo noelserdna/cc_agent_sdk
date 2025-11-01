@@ -5,7 +5,6 @@ This module defines models for analysis metadata and candidate summary.
 """
 
 from datetime import datetime
-from typing import Literal
 
 from pydantic import BaseModel, Field
 

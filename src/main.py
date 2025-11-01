@@ -6,17 +6,17 @@ CORS configuration, and routers.
 """
 
 import asyncio
-import time
 from contextlib import asynccontextmanager
+import time
 from typing import Any
 
-import structlog
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
+import structlog
 
 from src.core.config import settings
 from src.core.logging import get_logger
@@ -244,8 +244,8 @@ async def general_exception_handler(request: Request, exc: Exception) -> JSONRes
 
 
 # Import and include routers
-from src.api.analyze import router as analyze_router
-from src.api.health import router as health_router
+from src.api.analyze import router as analyze_router  # noqa: E402
+from src.api.health import router as health_router  # noqa: E402
 
 app.include_router(health_router, tags=["Health"])
 app.include_router(analyze_router, tags=["Analysis"])

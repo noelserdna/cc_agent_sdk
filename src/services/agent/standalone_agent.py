@@ -7,11 +7,10 @@ usando el Agent SDK directamente, sin dependencias de FastAPI.
 
 from pathlib import Path
 
+from claude_agent_sdk import ClaudeAgentOptions, query
 import structlog
-from claude_agent_sdk import query, ClaudeAgentOptions
 
 from src.core.config import Settings
-from src.models.response import CVAnalysisResponse
 
 logger = structlog.get_logger(__name__)
 
