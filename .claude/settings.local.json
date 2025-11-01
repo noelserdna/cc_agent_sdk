@@ -60,7 +60,9 @@
       "Bash(gh:*)",
       "Bash(git checkout:*)",
       "Bash($env:PYTHONIOENCODING='utf-8')",
-      "Bash(Select-Object -First 300)"
+      "Bash(Select-Object -First 300)",
+      "Bash(ruff check:*)",
+      "Bash(git merge:*)"
     ],
     "deny": [],
     "ask": []
